@@ -16,7 +16,9 @@ policy-as-code and full observability.
 This repository holds the **application**: six services in five languages, plus a local stack
 that runs the whole system on a laptop, including Azure Service Bus (through the official emulator).
 
-> **Status:** Phases 1–5 of 10 complete. See the [roadmap](#roadmap). Infrastructure lives in [shopflow-infra](https://github.com/kirthikesh/shopflow-infra).
+> **Status:** Phases 1–6 of 10 complete, including canary releases in prod. See the [roadmap](#roadmap). Infrastructure lives in [shopflow-infra](https://github.com/kirthikesh/shopflow-infra). The Azure environment is switched off to save cost; the screenshots are from the last live release.
+
+![ShopFlow running in prod on AKS](docs/images/shop-home.jpg)
 
 ---
 
@@ -117,7 +119,7 @@ flowchart LR
     D -->|Argo CD| DS[dev rollout +<br/>smoke test]
     DS --> A{Approval<br/>shopflow-prod}
     A --> PR2[Commit same tag to<br/>gitops envs/prod]
-    PR2 -->|Argo CD| PS[prod rollout +<br/>smoke test]
+    PR2 -->|Argo CD| PS[prod canary 50% +<br/>health check +<br/>smoke test]
 ```
 
 | Stage | What it does |
@@ -125,11 +127,13 @@ flowchart LR
 | Test | ruff and pytest (Python), Maven tests (Java), `go vet` and `go test`, Node tests, Next.js type check and production build |
 | Build | Each image is scanned with Trivy. The build **fails on any CRITICAL vulnerability that has a fix**; every HIGH and CRITICAL finding is published to the Tests tab, and a CycloneDX SBOM per image is kept as a build artifact. Pushed only from `main` |
 | Release to dev | Creates the namespace's secrets from Azure, commits the tag to `envs/dev`, waits until Argo CD has all six services on it, then smoke-tests through the real load balancer |
-| Promote to prod | Waits for approval on `shopflow-prod`, then does the same for `envs/prod` with the **same tag**: nothing is rebuilt |
+| Promote to prod | Waits for approval on `shopflow-prod`, then does the same for `envs/prod` with the **same tag**: nothing is rebuilt. The frontend goes out as a **canary** (Argo Rollouts): 50% of traffic, an automated health check, then full rollout, or automatic rollback if the check fails |
 
 Both release stages are skipped automatically when the cluster is switched off. The only stored
 credential is a **deploy key that can write to shopflow-gitops and nothing else**; Azure access is the
 agent's managed identity.
+
+![All four stages green: test, build, release to dev, promote to prod](docs/images/app-pipeline.jpg)
 
 Templates live in [`.azure-pipelines/templates`](.azure-pipelines/templates): managed-identity sign-in,
 build-scan-push (reused for all six services) and the GitOps release (reused for both environments).
@@ -141,6 +145,7 @@ build-scan-push (reused for all six services) and the GitOps release (reused for
 | Python tests: `ModuleNotFoundError: No module named 'app'` | Plain `pytest` doesn't put the service folder on the import path | `pyproject.toml` with `pythonpath = ["."]` in both Python services |
 | **Trivy blocked the order-service image**: critical Tomcat (CVE-2026-65182) and Spring MVC CVEs | Spring Boot 3.5 left open-source support in June 2026, so its fixes are commercial only | Upgraded to **Spring Boot 4.1** (Spring Framework 7, Tomcat 11): new `webmvc` and `flyway` starters, and Jackson 3 (`tools.jackson`) |
 | Deploy timed out: pods `Pending` on AKS | The single dev node was fully reserved, and rolling updates start the new pod before stopping the old one | Smaller CPU requests, and `maxSurge: 0` in the dev overlay |
+| `order-service` stuck `Pending` after adding canaries | Argo Rollouts and a second prod frontend used the last free CPU on the node | Lowered its CPU request in shopflow-gitops; Argo CD rolled it out and the rerun went green |
 
 ## Design decisions
 
@@ -184,7 +189,7 @@ Related repositories:
 - [x] **Phase 4:** Ansible: hardened jump box and self-hosted Azure DevOps agent
 - [x] **Phase 5:** Azure DevOps pipelines: templates, Trivy scanning, SBOMs, approvals, managed-identity auth
 - [ ] Still to come from Phases 3–5: private API server, ingress with cert-manager, image signing
-- [x] **Phase 6:** GitOps CD with Argo CD: dev and prod, approval-gated promotion (canary releases still to come)
+- [x] **Phase 6:** GitOps CD with Argo CD: dev and prod, approval-gated promotion, canary releases with Argo Rollouts
 - [ ] **Phase 7:** Security: Key Vault, Kyverno, Defender for Containers, Azure Policy
 - [ ] **Phase 8:** Observability: OpenTelemetry tracing, Grafana, SLOs, alerting
 - [ ] **Phase 9:** Resilience: KEDA, k6 load tests, chaos testing, Velero DR
