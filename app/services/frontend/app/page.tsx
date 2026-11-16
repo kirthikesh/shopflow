@@ -21,7 +21,7 @@ export default function ShopPage() {
     <>
       <section className="hero">
         <div className="hero__text">
-          <h1>Everything your desk is missing.</h1>
+          <h1>Your desk, upgraded.</h1>
           <p>
             Keyboards that feel right, a sharper screen, and the small things that keep cables off the floor.
             Ordered today, confirmed in seconds.

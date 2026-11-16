@@ -76,8 +76,9 @@ steps:
       tag="${BUILD_SOURCEVERSION:0:7}"
 
       echo "Waiting for Argo CD to roll out $tag to $ns..."
+      # Deployments, plus the frontend Rollout where the canary is enabled (prod).
       for _ in $(seq 1 60); do
-        images=$(kubectl -n "$ns" get deploy -l part-of=shopflow \
+        images=$(kubectl -n "$ns" get deploy,rollouts.argoproj.io -l part-of=shopflow \
           -o jsonpath='{range .items[*]}{.spec.template.spec.containers[0].image}{"\n"}{end}' 2>/dev/null || true)
         total=$(printf '%s' "$images" | grep -c . || true)
         current=$(printf '%s\n' "$images" | grep -c ":$tag\$" || true)
@@ -87,6 +88,25 @@ steps:
       done
       [ "${current:-0}" -eq 6 ] || { echo "Argo CD did not apply $tag in time"; kubectl -n argocd get applications; exit 1; }
       kubectl -n "$ns" rollout status deploy --timeout=8m
+
+      # Canary: wait for the health check and the pause to pass. A failed check
+      # aborts the rollout (Degraded) and Argo Rollouts puts the old version back.
+      if kubectl -n "$ns" get rollouts.argoproj.io frontend >/dev/null 2>&1; then
+        for _ in $(seq 1 60); do
+          IFS='|' read -r phase step current stable < <(kubectl -n "$ns" get rollouts.argoproj.io frontend \
+            -o jsonpath='{.status.phase}|{.status.currentStepIndex}|{.status.currentPodHash}|{.status.stableRS}{"\n"}')
+          echo "  canary: $phase (step ${step:-0} of 3)"
+          # Done only when the new version has become the stable one.
+          stable_image=$(kubectl -n "$ns" get rs -l "rollouts-pod-template-hash=${stable:-none}" \
+            -o jsonpath='{.items[0].spec.template.spec.containers[0].image}' 2>/dev/null || true)
+          [ "$phase" = "Healthy" ] && [ "$current" = "$stable" ] && [ "${stable_image##*:}" = "$tag" ] && break
+          [ "$phase" = "Degraded" ] && { echo "Canary failed its health check and was rolled back."; \
+            kubectl -n "$ns" get analysisruns.argoproj.io; exit 1; }
+          sleep 10
+        done
+        [ "$phase" = "Healthy" ] || { echo "Canary did not finish in time"; exit 1; }
+        echo "Canary passed: all frontend traffic is on $tag."
+      fi
       kubectl -n argocd get application "shopflow-${{ parameters.env }}" \
         -o jsonpath='{"Argo CD: "}{.status.sync.status}{", "}{.status.health.status}{"\n"}'
     displayName: Wait for Argo CD rollout
