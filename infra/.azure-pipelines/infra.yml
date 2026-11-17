@@ -14,13 +14,13 @@ trigger:
   branches:
     include: [main]
   paths:
-    include: [platform, envs, modules, scripts, .azure-pipelines]
+    include: [infra/platform, infra/envs, infra/modules, infra/scripts, infra/.azure-pipelines]
 
 pr:
   branches:
     include: [main]
   paths:
-    include: [platform, envs, modules, scripts, .azure-pipelines]
+    include: [infra/platform, infra/envs, infra/modules, infra/scripts, infra/.azure-pipelines]
 
 parameters:
   - name: aks
@@ -45,6 +45,9 @@ variables:
     value: rg-shopflow-dev-neu
   - name: TF_IN_AUTOMATION
     value: "true"
+  # This pipeline lives in the infra/ folder of the ShopFlow monorepo.
+  - name: infraDir
+    value: $(System.DefaultWorkingDirectory)/infra
 
 stages:
   # ---------------------------------------------------------------------------
@@ -67,6 +70,7 @@ stages:
                 terraform -chdir=$d validate
               done
             displayName: terraform fmt and validate
+            workingDirectory: $(infraDir)
 
           - bash: |
               set -euo pipefail
@@ -77,6 +81,7 @@ stages:
               }
               cd ansible && "$venv/bin/ansible-lint" --profile production
             displayName: ansible-lint (production profile)
+            workingDirectory: $(infraDir)
 
           # Misconfiguration scan of Terraform and Ansible. HIGH and CRITICAL
           # findings fail the build; accepted risks are listed with reasons in
@@ -90,6 +95,7 @@ stages:
               trivy config --quiet --ignorefile .trivyignore.yaml \
                 --severity HIGH,CRITICAL --exit-code 1 .
             displayName: Trivy IaC scan
+            workingDirectory: $(infraDir)
 
           - task: PublishTestResults@2
             displayName: Publish scan results
@@ -149,6 +155,7 @@ stages:
               echo "AKS and Service Bus: $aks (${{ parameters.aks }})"
               echo "##vso[task.setvariable variable=aksEnabled]$aks"
             displayName: Prepare variables
+            workingDirectory: $(infraDir)
 
           - template: templates/terraform-plan.yml
             parameters:

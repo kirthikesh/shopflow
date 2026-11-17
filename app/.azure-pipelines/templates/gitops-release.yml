@@ -1,10 +1,11 @@
 # Releases this commit to one environment, the GitOps way: the pipeline does
-# not deploy anything itself. It commits the image tag to shopflow-gitops, and
-# Argo CD (running in the cluster) rolls it out. The pipeline then waits for
-# that rollout and smoke-tests the result.
+# not deploy anything itself. It commits the image tag to the gitops/ folder,
+# and Argo CD (running in the cluster) rolls it out. The pipeline then waits for
+# that rollout and smoke-tests the result. The release commit only touches
+# gitops/, so it doesn't trigger the app or infra pipelines again.
 #
 # Needs: the Secure File "shopflow-gitops-deploy" (a deploy key with write
-# access to shopflow-gitops only) and the cluster name in $(aksName).
+# access to this repository) and the cluster name in $(aksName).
 parameters:
   - name: env
     type: string
@@ -38,13 +39,15 @@ steps:
       ssh_cmd="ssh -i $(deployKey.secureFilePath) -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$known_hosts"
       echo "##vso[task.setvariable variable=GIT_SSH_COMMAND]$ssh_cmd"
 
-      dir="$(Agent.TempDirectory)/gitops"
+      # A separate clone on the main branch: the checkout above is a detached
+      # commit, and the release has to be pushed on top of the latest main.
+      dir="$(Agent.TempDirectory)/release"
       rm -rf "$dir"
-      GIT_SSH_COMMAND="$ssh_cmd" git clone -q --depth 20 git@github.com:kirthikesh/shopflow-gitops.git "$dir"
+      GIT_SSH_COMMAND="$ssh_cmd" git clone -q --depth 20 git@github.com:kirthikesh/shopflow.git "$dir"
       git -C "$dir" config user.name "shopflow-pipeline"
       git -C "$dir" config user.email "shopflow-pipeline@users.noreply.github.com"
-      echo "##vso[task.setvariable variable=GITOPS_DIR]$dir"
-    displayName: Clone shopflow-gitops
+      echo "##vso[task.setvariable variable=GITOPS_DIR]$dir/gitops"
+    displayName: Clone main for the release commit
 
   - bash: ./bootstrap/install.sh
     workingDirectory: $(GITOPS_DIR)
@@ -58,6 +61,7 @@ steps:
       export SERVICEBUS_CONNECTION_STRING=$(az servicebus namespace authorization-rule keys list \
         -g "$(devResourceGroup)" --namespace-name "$sb" -n shopflow-app --query primaryConnectionString -o tsv)
       NS=shopflow-${{ parameters.env }} ./deploy/k8s/create-secrets.sh
+    workingDirectory: $(appDir)
     displayName: Secrets for ${{ parameters.env }} (from Azure, never in Git)
 
   - bash: |
@@ -68,7 +72,7 @@ steps:
       kubectl -n argocd annotate application "shopflow-${{ parameters.env }}" \
         argocd.argoproj.io/refresh=normal --overwrite >/dev/null 2>&1 || true
     workingDirectory: $(GITOPS_DIR)
-    displayName: Release ${{ parameters.env }} → commit tag to shopflow-gitops
+    displayName: Release ${{ parameters.env }} → commit tag to gitops/
 
   - bash: |
       set -euo pipefail

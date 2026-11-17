@@ -1,4 +1,4 @@
-module github.com/kirthikesh/shopflow-app/services/payment-service
+module github.com/kirthikesh/shopflow/app/services/payment-service
 
 go 1.24
 

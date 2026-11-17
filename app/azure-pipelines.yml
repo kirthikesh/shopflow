@@ -2,7 +2,7 @@
 #
 #   Pull request  ->  Test  ->  Build + scan (nothing is pushed)
 #   main          ->  Test  ->  Build + scan + push
-#                 ->  Release to dev   (commit tag to shopflow-gitops, Argo CD deploys, smoke test)
+#                 ->  Release to dev   (commit tag to gitops/, Argo CD deploys, smoke test)
 #                 ->  approval  ->  Promote to prod  (same tag, same checks)
 #
 # Runs on the self-hosted agent in the hub network and signs in to Azure with the
@@ -13,13 +13,13 @@ trigger:
   branches:
     include: [main]
   paths:
-    include: [services, deploy, azure-pipelines.yml, .azure-pipelines]
+    include: [app/services, app/deploy, app/azure-pipelines.yml, app/.azure-pipelines]
 
 pr:
   branches:
     include: [main]
   paths:
-    include: [services, deploy, azure-pipelines.yml, .azure-pipelines]
+    include: [app/services, app/deploy, app/azure-pipelines.yml, app/.azure-pipelines]
 
 parameters:
   - name: services
@@ -38,6 +38,8 @@ pool:
 variables:
   platformResourceGroup: rg-shopflow-platform-neu
   devResourceGroup: rg-shopflow-dev-neu
+  # This pipeline lives in the app/ folder of the ShopFlow monorepo.
+  appDir: $(System.DefaultWorkingDirectory)/app
   isMain: $[ and(eq(variables['Build.SourceBranch'], 'refs/heads/main'), ne(variables['Build.Reason'], 'PullRequest')) ]
 
 stages:
@@ -58,6 +60,7 @@ stages:
           - ${{ each svc in parameters.services }}:
               - bash: make ${{ svc.test }}
                 displayName: ${{ svc.name }}
+                workingDirectory: $(appDir)
 
           # Test containers run as root and leave root-owned files in the
           # workspace; hand them back to the agent user so the next run can clean up.
@@ -119,7 +122,7 @@ stages:
   # ---------------------------------------------------------------------------
   # GitOps release: main only, skipped quietly when the cluster is switched off.
   # The pipeline never runs kubectl apply for the app. It commits the image tag
-  # to shopflow-gitops and Argo CD deploys it; then the pipeline verifies.
+  # to the gitops/ folder and Argo CD deploys it; then the pipeline verifies.
   - stage: Dev
     displayName: Release to dev
     dependsOn: Build

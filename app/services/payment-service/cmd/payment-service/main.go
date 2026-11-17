@@ -15,8 +15,8 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
-	"github.com/kirthikesh/shopflow-app/services/payment-service/internal/broker"
-	"github.com/kirthikesh/shopflow-app/services/payment-service/internal/payment"
+	"github.com/kirthikesh/shopflow/app/services/payment-service/internal/broker"
+	"github.com/kirthikesh/shopflow/app/services/payment-service/internal/payment"
 )
 
 func main() {

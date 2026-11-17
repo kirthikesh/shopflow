@@ -57,7 +57,7 @@ test-frontend: ## Frontend type check and production build (Next.js)
 # ACR = your registry name, e.g. make images ACR=acrshopflow0q6q39
 SERVICES := product-service cart-service order-service payment-service notification-service frontend
 TAG      ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo dev)
-INFRA_DIR ?= ../shopflow-infra
+INFRA_DIR ?= ../infra
 
 check-acr:
 	@test -n "$(ACR)" || { echo "Set ACR, e.g. make images ACR=acrshopflow0q6q39"; exit 1; }
@@ -78,7 +78,7 @@ images-local: check-acr ## Build on this Mac for linux/amd64 and push to ACR (wh
 	    --push services/$$s || exit 1; \
 	done
 
-# Deployment is GitOps: the pipeline commits the image tag to shopflow-gitops and
+# Deployment is GitOps: the pipeline commits the image tag to ../gitops and
 # Argo CD rolls it out. These targets are for looking, not for deploying.
 ENV ?= dev
 NS  := shopflow-$(ENV)

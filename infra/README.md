@@ -1,4 +1,4 @@
-# shopflow-infra
+# ShopFlow · infra
 
 ![Terraform](https://img.shields.io/badge/Terraform-1.9+-111?style=flat-square&logo=terraform&logoColor=white)
 ![AzureRM](https://img.shields.io/badge/AzureRM-5.x-111?style=flat-square&logo=microsoftazure&logoColor=white)
@@ -7,7 +7,7 @@
 ![Azure DevOps](https://img.shields.io/badge/Azure_DevOps-Pipelines-111?style=flat-square&logo=azuredevops&logoColor=white)
 ![Ansible](https://img.shields.io/badge/Ansible-production_lint-111?style=flat-square&logo=ansible&logoColor=white)
 
-Terraform for the Azure landing zone that runs [ShopFlow](https://github.com/kirthikesh/shopflow-app),
+Terraform for the Azure landing zone that runs [ShopFlow](../README.md),
 an event-driven microservices store. Hub-and-spoke networking, private DNS, a container registry,
 centralised logging, and cost and policy guardrails, built as small reusable modules in separate,
 independently deployable layers.
@@ -162,7 +162,7 @@ depends on) or `management/` (the VM it runs on).
    `STATE_STORAGE_ACCOUNT`, `BUDGET_EMAIL`, `OWNER_OBJECT_ID` (`az ad signed-in-user show --query id -o tsv`)
    and `ADMIN_IP` (your public IP).
 3. **Pipelines → Environments**: create `shopflow-infra` and add an **Approvals** check.
-4. **Pipelines → New pipeline → GitHub**, choose this repo and the existing file `.azure-pipelines/infra.yml`.
+4. **Pipelines → New pipeline → GitHub**, choose `kirthikesh/shopflow` and the existing file `infra/.azure-pipelines/infra.yml`.
 
 ## Cost
 
@@ -217,7 +217,7 @@ The budget alert emails at 50%, 80% and 100% of the monthly amount, and when the
 ## Repository layout
 
 ```
-shopflow-infra/
+infra/
 ├── Makefile
 ├── .azure-pipelines/   infra pipeline and templates
 ├── .trivyignore.yaml   accepted scan findings, with reasons
@@ -252,5 +252,5 @@ shopflow-infra/
 - [ ] Make the AKS API fully private once the jump box exists (Phase 4)
 - [x] Ansible-managed jump box and Azure DevOps self-hosted agent (Phase 4)
 - [x] Azure DevOps pipeline: `plan` on pull request, approval before `apply`, managed-identity auth (Phase 5)
-- [x] GitOps with Argo CD: dev and prod on one cluster, separate Service Bus per environment (Phase 6, see [shopflow-gitops](https://github.com/kirthikesh/shopflow-gitops))
+- [x] GitOps with Argo CD: dev and prod on one cluster, separate Service Bus per environment (Phase 6, see [`gitops/`](../gitops))
 - [ ] Prod spoke (`envs/prod`, 10.20.0.0/16)

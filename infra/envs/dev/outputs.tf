@@ -41,7 +41,7 @@ output "servicebus_connection_strings" {
   sensitive   = true
 }
 
-# Kept for `make deploy` in shopflow-app, which deploys dev only.
+# Kept for `make deploy` in ../app, which deploys dev only.
 output "servicebus_connection_string" {
   value     = try(module.service_bus["dev"].app_connection_string, null)
   sensitive = true

@@ -37,3 +37,4 @@ jobs:
                 terraform -chdir=${{ parameters.layer }} apply -input=false -lock-timeout=5m \
                   "$(Pipeline.Workspace)/tfplan-${{ parameters.name }}/tfplan"
               displayName: terraform apply (${{ parameters.layer }})
+              workingDirectory: $(infraDir)

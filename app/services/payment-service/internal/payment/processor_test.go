@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kirthikesh/shopflow-app/services/payment-service/internal/events"
+	"github.com/kirthikesh/shopflow/app/services/payment-service/internal/events"
 )
 
 func fixedProcessor() *Processor {

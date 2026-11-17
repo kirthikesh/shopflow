@@ -1,4 +1,4 @@
-# ShopFlow
+# ShopFlow · app
 
 ![Python](https://img.shields.io/badge/Python-FastAPI-111?style=flat-square&logo=python&logoColor=white)
 ![Java](https://img.shields.io/badge/Java_21-Spring_Boot-111?style=flat-square&logo=openjdk&logoColor=white)
@@ -13,10 +13,10 @@ An event-driven microservices store, built as the application layer of an enterp
 platform on **Azure**: private AKS, Terraform landing zone, Azure DevOps pipelines, GitOps,
 policy-as-code and full observability.
 
-This repository holds the **application**: six services in five languages, plus a local stack
+This folder holds the **application**: six services in five languages, plus a local stack
 that runs the whole system on a laptop, including Azure Service Bus (through the official emulator).
 
-> **Status:** Phases 1–6 of 10 complete, including canary releases in prod. See the [roadmap](#roadmap). Infrastructure lives in [shopflow-infra](https://github.com/kirthikesh/shopflow-infra). The Azure environment is switched off to save cost; the screenshots are from the last live release.
+> Part of the [ShopFlow monorepo](../README.md). Infrastructure lives in [`infra/`](../infra), deployment config in [`gitops/`](../gitops). The Azure environment is switched off to save cost; the screenshots are from the last live release.
 
 ![ShopFlow running in prod on AKS](docs/images/shop-home.jpg)
 
@@ -106,7 +106,7 @@ make test-order         # one service
 
 [`azure-pipelines.yml`](azure-pipelines.yml) runs in Azure DevOps on a self-hosted agent inside the
 Azure hub network, and signs in to Azure as that VM's managed identity. The pipeline **never deploys
-the app itself**: it commits the image tag to [shopflow-gitops](https://github.com/kirthikesh/shopflow-gitops),
+the app itself**: it commits the image tag to [`gitops/`](../gitops),
 and **Argo CD** in the cluster rolls it out.
 
 ```mermaid
@@ -130,8 +130,9 @@ flowchart LR
 | Promote to prod | Waits for approval on `shopflow-prod`, then does the same for `envs/prod` with the **same tag**: nothing is rebuilt. The frontend goes out as a **canary** (Argo Rollouts): 50% of traffic, an automated health check, then full rollout, or automatic rollback if the check fails |
 
 Both release stages are skipped automatically when the cluster is switched off. The only stored
-credential is a **deploy key that can write to shopflow-gitops and nothing else**; Azure access is the
-agent's managed identity.
+credential is a **deploy key for this repository**, and the release commit only touches `gitops/`, so it
+never starts the app or infra pipeline again (each pipeline only triggers on its own folder). Azure access
+is the agent's managed identity.
 
 ![All four stages green: test, build, release to dev, promote to prod](docs/images/app-pipeline.jpg)
 
@@ -145,7 +146,7 @@ build-scan-push (reused for all six services) and the GitOps release (reused for
 | Python tests: `ModuleNotFoundError: No module named 'app'` | Plain `pytest` doesn't put the service folder on the import path | `pyproject.toml` with `pythonpath = ["."]` in both Python services |
 | **Trivy blocked the order-service image**: critical Tomcat (CVE-2026-65182) and Spring MVC CVEs | Spring Boot 3.5 left open-source support in June 2026, so its fixes are commercial only | Upgraded to **Spring Boot 4.1** (Spring Framework 7, Tomcat 11): new `webmvc` and `flyway` starters, and Jackson 3 (`tools.jackson`) |
 | Deploy timed out: pods `Pending` on AKS | The single dev node was fully reserved, and rolling updates start the new pod before stopping the old one | Smaller CPU requests, and `maxSurge: 0` in the dev overlay |
-| `order-service` stuck `Pending` after adding canaries | Argo Rollouts and a second prod frontend used the last free CPU on the node | Lowered its CPU request in shopflow-gitops; Argo CD rolled it out and the rerun went green |
+| `order-service` stuck `Pending` after adding canaries | Argo Rollouts and a second prod frontend used the last free CPU on the node | Lowered its CPU request in `gitops/`; Argo CD rolled it out and the rerun went green |
 
 ## Design decisions
 
@@ -159,12 +160,12 @@ build-scan-push (reused for all six services) and the GitOps release (reused for
 ## Repository layout
 
 ```
-shopflow-app/
+app/
 ├── azure-pipelines.yml       CI/CD (Azure DevOps)
 ├── .azure-pipelines/templates/
 ├── docker-compose.yml        local stack
 ├── Makefile                  make up / test / deploy
-├── deploy/k8s/               create-secrets.sh (manifests live in shopflow-gitops)
+├── deploy/k8s/               create-secrets.sh (manifests live in ../gitops)
 ├── local/
 │   ├── postgres/init.sql     creates one database per service
 │   └── servicebus/config.json  queue, topic and subscriptions for the emulator
@@ -177,22 +178,10 @@ shopflow-app/
     └── notification-service/
 ```
 
-Related repositories:
-- [`shopflow-infra`](https://github.com/kirthikesh/shopflow-infra): Terraform landing zone, Ansible, infrastructure pipeline
-- [`shopflow-gitops`](https://github.com/kirthikesh/shopflow-gitops): Helm chart, per-environment values, Argo CD
+Related folders:
+- [`infra/`](../infra): Terraform landing zone, Ansible, infrastructure pipeline
+- [`gitops/`](../gitops): Helm chart, per-environment values, Argo CD, Argo Rollouts
 
 ## Roadmap
 
-- [x] **Phase 1:** Six services, Dockerfiles, local stack with the Service Bus emulator
-- [x] **Phase 2:** Terraform landing zone: hub-spoke network, private DNS, remote state, guardrails
-- [x] **Phase 3:** AKS with Workload Identity, Cilium and Entra ID RBAC; Kustomize manifests; real Service Bus
-- [x] **Phase 4:** Ansible: hardened jump box and self-hosted Azure DevOps agent
-- [x] **Phase 5:** Azure DevOps pipelines: templates, Trivy scanning, SBOMs, approvals, managed-identity auth
-- [ ] Still to come from Phases 3–5: private API server, ingress with cert-manager, image signing
-- [x] **Phase 6:** GitOps CD with Argo CD: dev and prod, approval-gated promotion, canary releases with Argo Rollouts
-- [ ] **Phase 7:** Security: Key Vault, Kyverno, Defender for Containers, Azure Policy
-- [ ] **Phase 8:** Observability: OpenTelemetry tracing, Grafana, SLOs, alerting
-- [ ] **Phase 9:** Resilience: KEDA, k6 load tests, chaos testing, Velero DR
-- [ ] **Phase 10:** Write-up and demo
-
-Known follow-ups: a transactional outbox in the order service, and stock reservation as a saga.
+See the [project roadmap](../README.md#roadmap).

@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kirthikesh/shopflow-app/services/payment-service/internal/events"
+	"github.com/kirthikesh/shopflow/app/services/payment-service/internal/events"
 )
 
 // DefaultLimitCents is the largest amount approved without manual review: EUR 2,000.

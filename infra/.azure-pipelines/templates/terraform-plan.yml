@@ -36,10 +36,11 @@ steps:
       exit 0
     name: plan
     displayName: terraform plan (${{ parameters.layer }})
+    workingDirectory: $(infraDir)
 
   # The plan holds resolved values, some sensitive. Pipeline artifacts are
   # private to the project and expire with the run's retention policy.
-  - publish: ${{ parameters.layer }}/tfplan
+  - publish: infra/${{ parameters.layer }}/tfplan
     artifact: tfplan-${{ parameters.name }}
     displayName: Publish saved plan
     condition: and(succeeded(), eq(variables['plan.changes'], 'true'))

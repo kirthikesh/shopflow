@@ -23,9 +23,9 @@ spec:
     spec:
       project: default
       source:
-        repoURL: https://github.com/kirthikesh/shopflow-gitops.git
+        repoURL: https://github.com/kirthikesh/shopflow.git
         targetRevision: main
-        path: charts/shopflow
+        path: gitops/charts/shopflow
         helm:
           valueFiles:
             - ../../envs/{{ .env }}/values.yaml

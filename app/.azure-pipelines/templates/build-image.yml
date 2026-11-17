@@ -17,7 +17,7 @@ steps:
         --label org.opencontainers.image.source="$(Build.Repository.Uri)" \
         --label org.opencontainers.image.revision="$(Build.SourceVersion)" \
         -t "$image:$(imageTag)" -t "$image:latest" \
-        services/${{ parameters.service }}
+        $(appDir)/services/${{ parameters.service }}
     displayName: ${{ parameters.service }} · build
 
   - bash: |

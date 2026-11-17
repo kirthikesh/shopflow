@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 # Creates the shopflow-secrets Kubernetes secret in one environment's namespace.
-# Values never touch Git: Argo CD deploys everything else from shopflow-gitops,
+# Values never touch Git: Argo CD deploys everything else from ../gitops,
 # but the secret is created here, by the pipeline.
 #   NS                            target namespace (default shopflow-dev)
 #   POSTGRES_PASSWORD             generated once, then kept (changing it would lock out the existing database)
 #   SERVICEBUS_CONNECTION_STRING  taken from the environment if set (the pipeline does this),
-#                                 otherwise read from the shopflow-infra Terraform outputs
+#                                 otherwise read from the ../infra Terraform outputs
 # Phase 7 replaces this with Key Vault + Workload Identity.
 set -euo pipefail
 
-INFRA_DIR="${INFRA_DIR:-../shopflow-infra}"
+INFRA_DIR="${INFRA_DIR:-../infra}"
 NS="${NS:-shopflow-dev}"
 
 kubectl get namespace "$NS" >/dev/null 2>&1 || kubectl create namespace "$NS"

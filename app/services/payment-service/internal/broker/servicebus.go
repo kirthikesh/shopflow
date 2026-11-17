@@ -10,9 +10,9 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/sdk/messaging/azservicebus"
 
-	"github.com/kirthikesh/shopflow-app/services/payment-service/internal/events"
-	"github.com/kirthikesh/shopflow-app/services/payment-service/internal/metrics"
-	"github.com/kirthikesh/shopflow-app/services/payment-service/internal/payment"
+	"github.com/kirthikesh/shopflow/app/services/payment-service/internal/events"
+	"github.com/kirthikesh/shopflow/app/services/payment-service/internal/metrics"
+	"github.com/kirthikesh/shopflow/app/services/payment-service/internal/payment"
 )
 
 // Config holds the Service Bus settings.

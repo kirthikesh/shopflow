@@ -12,3 +12,4 @@ steps:
         -backend-config="container_name=tfstate" \
         -backend-config="use_azuread_auth=true"
     displayName: terraform init (${{ parameters.layer }})
+    workingDirectory: $(infraDir)

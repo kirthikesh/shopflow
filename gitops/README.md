@@ -1,15 +1,15 @@
-# shopflow-gitops
+# ShopFlow · gitops
 
 ![Argo CD](https://img.shields.io/badge/Argo_CD-3.5-111?style=flat-square&logo=argo&logoColor=white)
 ![Helm](https://img.shields.io/badge/Helm-chart-111?style=flat-square&logo=helm&logoColor=white)
 ![Argo Rollouts](https://img.shields.io/badge/Argo_Rollouts-canary-111?style=flat-square&logo=argo&logoColor=white)
 ![AKS](https://img.shields.io/badge/AKS-dev_+_prod-111?style=flat-square&logo=kubernetes&logoColor=white)
 
-The desired state of every [ShopFlow](https://github.com/kirthikesh/shopflow-app) environment.
-**Argo CD** watches this repository and keeps the cluster matching it: nothing is deployed with
+The desired state of every [ShopFlow](../README.md) environment.
+**Argo CD** watches this folder and keeps the cluster matching it: nothing is deployed with
 `kubectl apply`, and a change made by hand in the cluster is reverted.
 
-Infrastructure lives in [shopflow-infra](https://github.com/kirthikesh/shopflow-infra).
+The application lives in [`app/`](../app), infrastructure in [`infra/`](../infra).
 
 ---
 
@@ -17,7 +17,7 @@ Infrastructure lives in [shopflow-infra](https://github.com/kirthikesh/shopflow-
 
 ```mermaid
 flowchart LR
-    APP([push to shopflow-app main]) --> CI[Test, build, Trivy scan,<br/>push image tagged with commit]
+    APP([push to main, app/ changed]) --> CI[Test, build, Trivy scan,<br/>push image tagged with commit]
     CI -->|commit tag| DEV[envs/dev/values.yaml]
     DEV -->|Argo CD sync| DEVNS[(shopflow-dev)]
     DEVNS --> SMOKE1[smoke test]
@@ -28,7 +28,8 @@ flowchart LR
     PRODNS --> SMOKE2[smoke test]
 ```
 
-- **Git is the only way in.** The pipeline's last action is a commit to this repo. Argo CD does the deploy.
+- **Git is the only way in.** The pipeline's last action is a commit to this folder. Argo CD does the deploy.
+- **No release loops.** Each pipeline only triggers on its own folder, so a release commit to `gitops/` never starts a build.
 - **Prod runs exactly what dev ran.** Promotion copies the tag dev was verified with. Nothing is rebuilt.
 - **Every change is a commit.** `git log envs/prod` is the full release history, and rolling back is `git revert`.
 
@@ -49,7 +50,7 @@ Dev stays a plain `Deployment`: canaries need two replicas, and dev is where a v
 ## Layout
 
 ```
-shopflow-gitops/
+gitops/
 ├── charts/shopflow/        one Helm chart: 6 services, Postgres, Redis, Mailpit, network policies
 ├── envs/
 │   ├── dev/values.yaml     image tag (set by the pipeline on every push to main)
@@ -64,17 +65,18 @@ shopflow-gitops/
 | | dev | prod |
 |---|---|---|
 | Namespace | `shopflow-dev` | `shopflow-prod` |
-| Updated by | every push to `main` in shopflow-app | approved "Promote to prod" stage |
+| Updated by | every push to `main` that changes `app/` | approved "Promote to prod" stage |
 | Entry point | internal load balancer (private IP) | public load balancer |
 | Service Bus | its own namespace | its own namespace |
 | Secrets | created by the pipeline, never in Git | created by the pipeline, never in Git |
 
 Both run on the dev AKS cluster to keep costs down. In a real setup prod would be a separate cluster
-in its own spoke (`envs/prod` in shopflow-infra); only the Argo CD destination would change.
+in its own spoke (`envs/prod` in ../infra); only the Argo CD destination would change.
 
 ## Use it
 
 ```bash
+# From the gitops/ folder.
 # Once per cluster (the app pipeline also does this automatically):
 ./bootstrap/install.sh
 
