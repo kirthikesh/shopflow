@@ -55,6 +55,11 @@ steps:
 
   - bash: |
       set -euo pipefail
+      # Phase 7: with secrets.provider keyvault the namespace gets its secrets
+      # from Key Vault through the CSI driver, and the pipeline stays out of it.
+      if grep -qE '^\s*provider:\s*keyvault' "$(GITOPS_DIR)/envs/${{ parameters.env }}/values.yaml"; then
+        echo "Secrets for ${{ parameters.env }} come from Key Vault."; exit 0
+      fi
       sb=$(az servicebus namespace list -g "$(devResourceGroup)" \
         --query "[?tags.app_env=='${{ parameters.env }}'].name | [0]" -o tsv)
       [ -n "$sb" ] || { echo "No Service Bus namespace for ${{ parameters.env }}"; exit 1; }

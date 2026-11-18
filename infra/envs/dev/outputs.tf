@@ -46,3 +46,12 @@ output "servicebus_connection_string" {
   value     = try(module.service_bus["dev"].app_connection_string, null)
   sensitive = true
 }
+
+output "app_identity_client_ids" {
+  description = "Workload identity client ID per app environment: secrets.keyVault.clientId in gitops."
+  value       = { for env, id in azurerm_user_assigned_identity.app : env => id.client_id }
+}
+
+output "tenant_id" {
+  value = try(azurerm_user_assigned_identity.app["dev"].tenant_id, null)
+}

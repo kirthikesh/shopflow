@@ -1,0 +1,50 @@
+{{- /*
+Event-driven autoscaling with KEDA.
+  HTTP services scale on request rate, read from Prometheus.
+  payment-service scales on the length of its Service Bus queue (Azure only:
+  the local Service Bus emulator has no management API for KEDA to read).
+*/}}
+{{- if .Values.autoscaling.enabled }}
+{{- range $name, $cfg := .Values.autoscaling.workloads }}
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: {{ $name }}
+  labels: { environment: {{ $.Values.environment | quote }}, app: {{ $name }}, part-of: shopflow }
+spec:
+  scaleTargetRef:
+    name: {{ $name }}
+  minReplicaCount: {{ $cfg.min }}
+  maxReplicaCount: {{ $cfg.max }}
+  advanced:
+    horizontalPodAutoscalerConfig:
+      behavior:
+        scaleDown:
+          stabilizationWindowSeconds: 120
+  triggers:
+    {{- if eq $cfg.trigger "servicebus" }}
+    - type: azure-servicebus
+      metadata:
+        queueName: {{ $cfg.queue }}
+        messageCount: {{ $cfg.messagesPerReplica | quote }}
+      authenticationRef:
+        name: servicebus
+    {{- else }}
+    - type: prometheus
+      metadata:
+        serverAddress: {{ $.Values.autoscaling.prometheusAddress }}
+        query: {{ $cfg.query | quote }}
+        threshold: {{ $cfg.threshold | quote }}
+    {{- end }}
+---
+{{- end }}
+apiVersion: keda.sh/v1alpha1
+kind: TriggerAuthentication
+metadata:
+  name: servicebus
+spec:
+  secretTargetRef:
+    - parameter: connection
+      name: shopflow-secrets
+      key: SERVICEBUS_CONNECTION_STRING
+{{- end }}

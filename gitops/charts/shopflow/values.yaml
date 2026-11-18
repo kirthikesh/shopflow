@@ -7,6 +7,12 @@ image:
   # Set per environment by the app pipeline: the commit it built and scanned.
   tag: ""
 
+# Service Bus messaging: order-service publishes OrderCreated, payment- and
+# notification-service consume. Off, orders are saved as PENDING_PAYMENT and
+# the two consumers aren't deployed (used on small laptops, see envs/local).
+messaging:
+  enabled: true
+
 # Load balancer in front of the frontend. internal: true gives it a private IP
 # in the VNet instead of a public one.
 publicEndpoint:
@@ -71,3 +77,54 @@ canary:
   weight: 50
   checks: 4
   pause: 30s
+
+# Traefik Ingress with an optional cert-manager certificate. Local uses it
+# instead of a cloud load balancer.
+ingress:
+  enabled: false
+  className: traefik
+  host: ""
+  tls:
+    enabled: false
+    clusterIssuer: ""
+
+# Phase 8. ServiceMonitors, SLO rules and the Grafana dashboard need
+# kube-prometheus-stack; tracing needs the OpenTelemetry Operator.
+observability:
+  enabled: false
+  tracing: false
+  otlpEndpoint: http://otel-collector.observability:4318
+  sampleRatio: "1"
+
+# Phase 9. KEDA ScaledObjects. A workload listed here is scaled by KEDA and
+# its Deployment stops setting replicas.
+autoscaling:
+  enabled: false
+  prometheusAddress: http://kube-prometheus-stack-prometheus.monitoring:9090
+  workloads: {}
+  # Example:
+  #   product-service:
+  #     trigger: prometheus
+  #     min: 1
+  #     max: 5
+  #     query: sum(rate(http_requests_total{service="product-service"}[1m]))
+  #     threshold: "20"          # requests per second per replica
+  #   payment-service:
+  #     trigger: servicebus      # Azure only
+  #     min: 1
+  #     max: 5
+  #     queue: order-created
+  #     messagesPerReplica: 20
+
+# Keep a pod of each stateless service running through drains and evictions.
+podDisruptionBudgets: false
+
+# Where shopflow-secrets comes from:
+#   kubernetes  created by the pipeline (deploy/k8s/create-secrets.sh)
+#   keyvault    synced from Azure Key Vault by the Secrets Store CSI driver
+secrets:
+  provider: kubernetes
+  keyVault:
+    name: ""
+    tenantId: ""
+    clientId: ""

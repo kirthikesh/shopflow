@@ -1,0 +1,34 @@
+{{- /*
+OpenTelemetry auto-instrumentation: the operator injects the Java, Python and
+Node.js agents into pods annotated with this Instrumentation, and they send
+traces to the collector. No tracing code in the services.
+*/}}
+{{- if and .Values.observability.enabled .Values.observability.tracing }}
+apiVersion: opentelemetry.io/v1alpha1
+kind: Instrumentation
+metadata:
+  name: shopflow
+spec:
+  exporter:
+    endpoint: {{ .Values.observability.otlpEndpoint }}
+  propagators: [tracecontext, baggage]
+  sampler:
+    type: parentbased_traceidratio
+    argument: {{ .Values.observability.sampleRatio | quote }}
+  resource:
+    addK8sUIDAttributes: false
+  java:
+    env:
+      - { name: OTEL_METRICS_EXPORTER, value: none }
+      - { name: OTEL_LOGS_EXPORTER, value: none }
+  python:
+    env:
+      - { name: OTEL_METRICS_EXPORTER, value: none }
+      - { name: OTEL_LOGS_EXPORTER, value: none }
+      # Prometheus metrics already come from the app's own /metrics.
+      - { name: OTEL_PYTHON_DISABLED_INSTRUMENTATIONS, value: "" }
+  nodejs:
+    env:
+      - { name: OTEL_METRICS_EXPORTER, value: none }
+      - { name: OTEL_LOGS_EXPORTER, value: none }
+{{- end }}

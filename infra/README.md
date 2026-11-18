@@ -164,6 +164,22 @@ depends on) or `management/` (the VM it runs on).
 3. **Pipelines → Environments**: create `shopflow-infra` and add an **Approvals** check.
 4. **Pipelines → New pipeline → GitHub**, choose `kirthikesh/shopflow` and the existing file `infra/.azure-pipelines/infra.yml`.
 
+## Security (Phase 7)
+
+> Written and checked with `terraform validate`, **not yet applied**: the Azure environment was torn
+> down before this phase. The first real apply will be on the next subscription.
+
+| Control | Where | What it does |
+|---|---|---|
+| Secrets in Key Vault | [`envs/dev/security.tf`](envs/dev/security.tf) | Per app environment: a managed identity federated with the `shopflow` service account (Workload Identity), **Key Vault Secrets User** on this vault only, and the Postgres password and Service Bus connection string stored as secrets. The Secrets Store CSI driver syncs them into the namespace; the pipeline no longer creates them. |
+| Azure Policy in the cluster | `envs/dev/security.tf`, `modules/aks` | The Azure Policy add-on, plus the built-in *Kubernetes pod security baseline* initiative assigned to the cluster in audit mode. Kyverno enforces at admission; this is the independent Azure-side view. |
+| Defender for Containers | `platform/main.tf` | Runtime threat detection and ACR image assessment for the subscription. Off by default (`defender_for_containers`), because it's billed per vCore. |
+| Private API server | `modules/aks`, `platform/main.tf` | `aks_api_server_private = true` takes the API server off the internet. Its name resolves through `privatelink.<region>.azmk8s.io` in the hub, linked to every spoke, so the pipeline agent can still reach it over peering. |
+| Image signing | `../app/.azure-pipelines`, `../gitops/platform/kyverno/policies-azure` | The app pipeline signs every image by digest with cosign and attaches its SBOM as a signed attestation. Kyverno rejects ACR images without both. |
+
+The pipeline identity can grant two more roles for this (constrained delegation in
+[`management/main.tf`](management/main.tf)): **Key Vault Secrets User** and **Private DNS Zone Contributor**.
+
 ## Cost
 
 Defaults are chosen to keep an idle landing zone at a few euros a month.

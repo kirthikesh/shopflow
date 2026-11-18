@@ -41,3 +41,9 @@ variable "owner" {
   type        = string
   default     = "kirthikesh"
 }
+
+variable "defender_for_containers" {
+  description = "Turn on Microsoft Defender for Containers for the subscription (about $7 per vCore per month)."
+  type        = bool
+  default     = false
+}

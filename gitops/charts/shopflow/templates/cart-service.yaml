@@ -4,7 +4,9 @@ metadata:
   name: cart-service
   labels: { environment: {{ .Values.environment | quote }}, app: cart-service, part-of: shopflow }
 spec:
+  {{- if not (include "shopflow.autoscaled" (list . "cart-service")) }}
   replicas: {{ (index .Values.workloads "cart-service").replicas | default 1 }}
+  {{- end }}
   strategy:
     {{- toYaml .Values.updateStrategy | nindent 4 }}
   revisionHistoryLimit: 3
@@ -13,6 +15,7 @@ spec:
   template:
     metadata:
       labels: { environment: {{ .Values.environment | quote }}, app: cart-service, part-of: shopflow }
+      {{- include "shopflow.podAnnotations" (list . "cart-service" "python") | nindent 6 }}
     spec:
       automountServiceAccountToken: false
       securityContext:
@@ -35,10 +38,12 @@ spec:
             capabilities: { drop: ["ALL"] }
           livenessProbe:
             httpGet: { path: /health, port: http }
+            timeoutSeconds: 3
             periodSeconds: 15
             failureThreshold: 3
           readinessProbe:
             httpGet: { path: /ready, port: http }
+            timeoutSeconds: 3
             periodSeconds: 5
           resources:
             {{- toYaml (index .Values.workloads "cart-service").resources | nindent 12 }}

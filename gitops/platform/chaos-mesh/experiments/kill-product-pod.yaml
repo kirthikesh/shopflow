@@ -1,0 +1,18 @@
+# Kill one product-service pod every minute. With two replicas, a disruption
+# budget and readiness probes, shoppers shouldn't notice.
+apiVersion: chaos-mesh.org/v1alpha1
+kind: Schedule
+metadata:
+  name: kill-product-pod
+  namespace: shopflow-local
+spec:
+  schedule: "@every 60s"
+  type: PodChaos
+  historyLimit: 5
+  concurrencyPolicy: Forbid
+  podChaos:
+    action: pod-kill
+    mode: one
+    selector:
+      namespaces: [shopflow-local]
+      labelSelectors: { app: product-service }

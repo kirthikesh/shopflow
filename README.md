@@ -12,8 +12,11 @@ An event-driven microservices store and the enterprise Azure platform it runs on
 six services in five languages, a Terraform landing zone, AKS, Azure DevOps pipelines that authenticate
 with a managed identity, and GitOps releases with Argo CD, including canary releases in prod.
 
-> **Status:** Phases 1–6 of 10 complete. The Azure environment is torn down to save cost; the
-> screenshots are from the last live release. `cd infra && make bootstrap && make up` rebuilds it.
+> **Status:** Phases 1–6 ran on Azure; the environment is torn down to save cost, and the
+> screenshots are from the last live release. Phases 7–9 run on a free **local cluster**
+> ([`local/`](local)): policies, SLOs, autoscaling, load and backup tests, with results. Their
+> Azure halves (Key Vault, Defender, Azure Policy, private API, image signing) are written and
+> validated with `terraform validate`, not yet applied.
 
 ![ShopFlow running in prod on AKS](app/docs/images/shop-home.jpg)
 
@@ -25,7 +28,9 @@ with a managed identity, and GitOps releases with Argo CD, including canary rele
 |---|---|---|
 | [`app/`](app) | Six services (Python, Java, Go, Node, Next.js) over Azure Service Bus, and a local stack that runs it all on a laptop | Test → build + Trivy scan + SBOM → release to dev → approval → promote to prod |
 | [`infra/`](infra) | Terraform landing zone (hub-spoke, private DNS, ACR, Key Vault, AKS, Service Bus, guardrails) and the Ansible-built agent | Validate + Trivy IaC → plan → approval → apply the saved plan |
-| [`gitops/`](gitops) | Helm chart, per-environment values, the Argo CD ApplicationSet and the canary setup | None: Argo CD pulls from it |
+| [`gitops/`](gitops) | Helm chart, per-environment values, the Argo CD ApplicationSet and the canary setup; cluster add-ons in [`gitops/platform`](gitops/platform) | None: Argo CD pulls from it |
+| [`local/`](local) | The whole platform on a kind cluster, plus the load, chaos and backup tests | `local/up.sh` |
+| [`tests/load`](tests/load) | k6 shopper journey with SLO thresholds | `make load-test` |
 
 Each folder has its own README with the details, the design decisions and the problems I hit along the way.
 
@@ -62,7 +67,11 @@ flowchart LR
 ## Quick start
 
 ```bash
-# Run the whole shop locally (Docker), including the Service Bus emulator
+# The whole platform on a free local Kubernetes cluster (kind)
+local/up.sh                # https://shop.localtest.me:9443, Grafana on grafana.localtest.me:9443
+make load-test             # k6 with SLO thresholds; KEDA scales product-service
+
+# Just the shop with Docker Compose, including the Service Bus emulator
 cd app && make up          # http://localhost:3000
 
 # Build the Azure platform (needs an Azure subscription)
@@ -77,13 +86,15 @@ cd infra && make bootstrap && make up
 - [x] **Phase 4:** Ansible: hardened jump box and self-hosted Azure DevOps agent
 - [x] **Phase 5:** Azure DevOps pipelines: templates, Trivy scanning, SBOMs, approvals, managed-identity auth
 - [x] **Phase 6:** GitOps CD with Argo CD: dev and prod, approval-gated promotion, canary releases with Argo Rollouts
-- [ ] Still to come from Phases 3–5: private API server, ingress with cert-manager, image signing
-- [ ] **Phase 7:** Security: Key Vault, Kyverno, Defender for Containers, Azure Policy
-- [ ] **Phase 8:** Observability: OpenTelemetry tracing, Grafana, SLOs, alerting
-- [ ] **Phase 9:** Resilience: KEDA, k6 load tests, chaos testing, Velero DR
-- [ ] **Phase 10:** Write-up and demo
+- [x] **Phases 3–5 follow-ups:** ingress with cert-manager (run locally); private API server and image signing (written for Azure)
+- [x] **Phase 7:** Kyverno policies (run locally); Key Vault with Workload Identity, Defender for Containers, Azure Policy (written for Azure)
+- [x] **Phase 8:** Prometheus, Grafana dashboard, SLOs with burn-rate alerts (run locally); OpenTelemetry tracing (written, not yet run)
+- [x] **Phase 9:** KEDA autoscaling, k6 load test, Velero backup drill (run locally); Chaos Mesh experiments (written, not yet run)
+- [x] **Phase 10:** Write-up: this README, [`local/README.md`](local/README.md) with the results and the problems I hit
 
-Known follow-ups: a transactional outbox in the order service, and stock reservation as a saga.
+Known follow-ups: a transactional outbox in the order service, stock reservation as a saga, a
+`pg_dump` backup hook so the local drill restores Postgres rows too, and running the tracing and
+chaos tests on a machine with more memory.
 
 ## History
 

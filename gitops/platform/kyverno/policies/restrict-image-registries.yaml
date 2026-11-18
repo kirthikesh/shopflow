@@ -1,0 +1,39 @@
+# Only images from registries we trust can run in the ShopFlow namespaces:
+# our own registry (ACR on Azure, shopflow.local on a laptop), official
+# Docker Hub images for the data stores, and the OpenTelemetry agents the
+# operator injects.
+apiVersion: policies.kyverno.io/v1
+kind: ValidatingPolicy
+metadata:
+  name: restrict-image-registries
+  annotations:
+    policies.kyverno.io/title: Restrict image registries
+    policies.kyverno.io/severity: high
+spec:
+  validationActions: [Deny]
+  evaluation:
+    background:
+      enabled: false   # admission only; no background scans on a laptop
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [pods]
+    namespaceSelector:
+      matchExpressions:
+        - key: kubernetes.io/metadata.name
+          operator: In
+          values: [shopflow-local, shopflow-dev, shopflow-prod]
+  variables:
+    - name: images
+      expression: >-
+        object.spec.containers.map(c, c.image) +
+        (has(object.spec.initContainers) ? object.spec.initContainers.map(c, c.image) : [])
+    - name: trusted
+      expression: >-
+        '^(acrshopflow[a-z0-9]*\\.azurecr\\.io/|shopflow\\.local/|ghcr\\.io/open-telemetry/|postgres:|redis:|axllent/mailpit:|curlimages/curl:)'
+  validations:
+    - expression: variables.images.all(i, i.matches(variables.trusted))
+      messageExpression: >-
+        'Untrusted registry: ' + variables.images.filter(i, !i.matches(variables.trusted)).join(', ')

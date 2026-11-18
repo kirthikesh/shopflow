@@ -1,0 +1,24 @@
+# Traefik as the ingress controller. On kind it listens on NodePorts that the
+# cluster config maps to ports 9080 and 9443 on the laptop.
+service:
+  spec:
+    type: NodePort
+ports:
+  web:
+    nodePort: 30080
+  websecure:
+    nodePort: 30443
+ingressClass:
+  enabled: true
+  isDefaultClass: true
+# All traffic goes through Traefik, so it gets a real CPU share, and its
+# probes tolerate a busy laptop instead of restarting it mid-test.
+resources:
+  requests: { cpu: 200m, memory: 128Mi }
+  limits: { memory: 384Mi }
+livenessProbe:
+  timeoutSeconds: 10
+  failureThreshold: 6
+readinessProbe:
+  timeoutSeconds: 10
+  failureThreshold: 3

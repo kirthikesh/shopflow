@@ -1,0 +1,32 @@
+# The Azure Service Bus emulator, next to the kind cluster on Docker's "kind"
+# network. It needs SQL Server and runs as amd64 (Rosetta on Apple Silicon),
+# which can't run inside the kind node, so it lives outside the cluster;
+# up.sh points a Service at it.
+name: shopflow-servicebus
+
+services:
+  mssql:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    platform: linux/amd64
+    restart: unless-stopped
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: ShopFlow_Local_2026!
+
+  servicebus-emulator:
+    image: mcr.microsoft.com/azure-messaging/servicebus-emulator:latest
+    container_name: shopflow-servicebus
+    # It exits if SQL Server isn't ready yet; keep retrying until it is.
+    restart: unless-stopped
+    environment:
+      SQL_SERVER: mssql
+      MSSQL_SA_PASSWORD: ShopFlow_Local_2026!
+      ACCEPT_EULA: "Y"
+    volumes:
+      - ../app/local/servicebus/config.json:/ServiceBus_Emulator/ConfigFiles/Config.json:ro
+    depends_on: [mssql]
+
+networks:
+  default:
+    name: kind
+    external: true

@@ -26,7 +26,9 @@ spec:
               - templateName: frontend-health
         - pause: { duration: {{ .Values.canary.pause }} }
   {{- else }}
+  {{- if not (include "shopflow.autoscaled" (list . "frontend")) }}
   replicas: {{ (index .Values.workloads "frontend").replicas | default 1 }}
+  {{- end }}
   strategy:
     {{- toYaml .Values.updateStrategy | nindent 4 }}
   {{- end }}
@@ -36,6 +38,7 @@ spec:
   template:
     metadata:
       labels: { environment: {{ .Values.environment | quote }}, app: frontend, part-of: shopflow }
+      {{- include "shopflow.podAnnotations" (list . "frontend" "nodejs") | nindent 6 }}
     spec:
       automountServiceAccountToken: false
       securityContext:
@@ -62,10 +65,12 @@ spec:
             capabilities: { drop: ["ALL"] }
           livenessProbe:
             httpGet: { path: /api/health, port: http }
+            timeoutSeconds: 3
             periodSeconds: 15
             failureThreshold: 3
           readinessProbe:
             httpGet: { path: /api/health, port: http }
+            timeoutSeconds: 3
             periodSeconds: 5
           resources:
             {{- toYaml (index .Values.workloads "frontend").resources | nindent 12 }}

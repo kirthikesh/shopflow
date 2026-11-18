@@ -1,0 +1,10 @@
+# The OpenTelemetry Operator injects tracing agents into annotated pods and
+# runs the collector. Its webhooks get certificates from cert-manager.
+manager:
+  collectorImage:
+    repository: otel/opentelemetry-collector-contrib
+  resources:
+    requests: { cpu: 20m, memory: 64Mi }
+admissionWebhooks:
+  certManager:
+    enabled: true

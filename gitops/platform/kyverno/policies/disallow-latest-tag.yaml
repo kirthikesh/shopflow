@@ -1,0 +1,30 @@
+# Every image needs an explicit tag that isn't "latest", so what runs is
+# exactly what was scanned and released.
+apiVersion: policies.kyverno.io/v1
+kind: ValidatingPolicy
+metadata:
+  name: disallow-latest-tag
+  annotations:
+    policies.kyverno.io/title: Disallow the latest tag
+    policies.kyverno.io/severity: medium
+spec:
+  validationActions: [Deny]
+  evaluation:
+    background:
+      enabled: false   # admission only; no background scans on a laptop
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [pods]
+    namespaceSelector:
+      matchExpressions:
+        - key: kubernetes.io/metadata.name
+          operator: In
+          values: [shopflow-local, shopflow-dev, shopflow-prod]
+  validations:
+    - expression: >-
+        object.spec.containers.all(c,
+          c.image.substring(c.image.lastIndexOf('/') + 1).contains(':') && !c.image.endsWith(':latest'))
+      message: Images need an explicit tag, and it can't be latest.

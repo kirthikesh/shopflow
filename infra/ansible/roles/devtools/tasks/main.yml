@@ -1,5 +1,5 @@
 # Tools the jump box and pipeline agent need: Azure CLI, Terraform, kubectl, kubelogin,
-# kustomize, Helm, Docker and Trivy.
+# kustomize, Helm, Docker, Trivy and cosign.
 # Packages come from each vendor's signed apt repository; kustomize from its checksum-verified release.
 
 - name: Create apt keyring directory
@@ -63,6 +63,15 @@
     mode: "0755"
     creates: /usr/local/bin/kustomize
 
+- name: Install cosign (checksum verified), for signing images in the app pipeline
+  ansible.builtin.get_url:
+    url: "{{ devtools_cosign_base }}/cosign-linux-amd64"
+    checksum: "sha256:{{ devtools_cosign_base }}/cosign_checksums.txt"
+    dest: /usr/local/bin/cosign
+    mode: "0755"
+  vars:
+    devtools_cosign_base: "https://github.com/sigstore/cosign/releases/download/v{{ devtools_cosign_version }}"
+
 - name: Install Helm
   community.general.snap:
     name: helm
@@ -85,6 +94,7 @@
     echo "docker    $(docker --version)"
     echo "trivy     $(trivy --version | head -1)"
     echo "kustomize $(kustomize version)"
+    echo "cosign    $(cosign version 2>&1 | grep -m1 GitVersion | awk '{print $2}')"
   args:
     executable: /bin/bash
   register: devtools_versions

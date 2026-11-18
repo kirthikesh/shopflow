@@ -21,7 +21,7 @@ output "hub_subnet_ids" {
 }
 
 output "private_dns_zone_ids" {
-  description = "Keyed by service: acr, key_vault."
+  description = "Keyed by service: acr, key_vault, aks."
   value = {
     for key, zone in local.private_dns_zones : key => module.private_dns.zone_ids[zone]
   }

@@ -1,0 +1,64 @@
+# kube-prometheus-stack: Prometheus, Alertmanager, Grafana and the exporters.
+# Sized for a laptop; picks up ServiceMonitors and rules from every namespace.
+fullnameOverride: kube-prometheus-stack
+
+prometheus:
+  prometheusSpec:
+    serviceMonitorSelectorNilUsesHelmValues: false
+    podMonitorSelectorNilUsesHelmValues: false
+    ruleSelectorNilUsesHelmValues: false
+    retention: 1d
+    resources:
+      requests: { cpu: 100m, memory: 256Mi }
+      limits: { memory: 1Gi }
+
+prometheusOperator:
+  resources:
+    requests: { cpu: 20m, memory: 64Mi }
+
+kube-state-metrics:
+  resources:
+    requests: { cpu: 10m, memory: 48Mi }
+
+alertmanager:
+  alertmanagerSpec:
+    resources:
+      requests: { cpu: 10m, memory: 32Mi }
+
+grafana:
+  adminPassword: shopflow   # local only
+  ingress:
+    enabled: true
+    ingressClassName: traefik
+    hosts: [grafana.localtest.me]
+  sidecar:
+    dashboards:
+      enabled: true
+      label: grafana_dashboard
+      searchNamespace: ALL
+      folderAnnotation: grafana_folder
+      provider:
+        foldersFromFilesStructure: true
+  additionalDataSources:
+    - name: Tempo
+      type: tempo
+      uid: tempo
+      access: proxy
+      url: http://tempo.observability:3200
+  resources:
+    requests: { cpu: 50m, memory: 128Mi }
+  # Grafana's first start runs its database migrations, which takes minutes on
+  # a busy laptop. Don't let the liveness probe kill it halfway through.
+  livenessProbe:
+    httpGet: { path: /api/health, port: 3000 }
+    initialDelaySeconds: 300
+    timeoutSeconds: 30
+    failureThreshold: 10
+
+# The control plane runs inside a kind node container: these targets aren't
+# reachable there and would only show as down.
+kubeEtcd: { enabled: false }
+nodeExporter: { enabled: false }
+kubeControllerManager: { enabled: false }
+kubeScheduler: { enabled: false }
+kubeProxy: { enabled: false }

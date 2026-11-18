@@ -82,3 +82,15 @@ variable "admin_object_ids" {
   description = "Entra ID object IDs that administer this resource, keyed by role, e.g. { owner = \"...\", pipeline = \"...\" }."
   type        = map(string)
 }
+
+variable "private_dns_zone_id" {
+  description = "Private DNS zone for the API server (privatelink.<region>.azmk8s.io) when api_server_private is true."
+  type        = string
+  default     = null
+}
+
+variable "azure_policy_enabled" {
+  description = "Install the Azure Policy add-on (Gatekeeper), so Azure Policy can audit what runs in the cluster."
+  type        = bool
+  default     = true
+}

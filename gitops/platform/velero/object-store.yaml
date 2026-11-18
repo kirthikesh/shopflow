@@ -1,0 +1,94 @@
+# S3-compatible object storage for local Velero backups: SeaweedFS, single
+# binary. (MinIO stopped publishing container images in 2025.) On Azure,
+# Velero writes to a Blob container instead.
+#
+# One S3 identity, matching the credentials in values.yaml. Kopia (Velero's
+# volume backups) needs signed requests, which SeaweedFS only checks with
+# identities configured.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: s3-identities
+  namespace: velero
+data:
+  s3.json: |
+    {
+      "identities": [
+        {
+          "name": "velero",
+          "credentials": [{ "accessKey": "velero", "secretKey": "velero-local-only" }],
+          "actions": ["Admin", "Read", "Write", "List", "Tagging"]
+        }
+      ]
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: s3
+  namespace: velero
+  labels: { app: s3 }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: s3 }
+  template:
+    metadata:
+      labels: { app: s3 }
+    spec:
+      containers:
+        - name: seaweedfs
+          image: chrislusf/seaweedfs:3.80
+          args: ["server", "-dir=/data", "-s3", "-s3.port=8333", "-s3.config=/etc/seaweedfs/s3.json",
+                 "-master.volumeSizeLimitMB=256", "-volume.max=10"]
+          ports:
+            - { name: s3, containerPort: 8333 }
+            - { name: master, containerPort: 9333 }
+            - { name: filer, containerPort: 8888 }
+          readinessProbe:
+            tcpSocket: { port: 8333 }
+            periodSeconds: 5
+          resources:
+            requests: { cpu: 20m, memory: 128Mi }
+            limits: { memory: 512Mi }
+          volumeMounts:
+            - { name: data, mountPath: /data }
+            - { name: identities, mountPath: /etc/seaweedfs }
+      volumes:
+        - name: data
+          emptyDir: {}
+        - name: identities
+          configMap: { name: s3-identities }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: s3
+  namespace: velero
+spec:
+  selector: { app: s3 }
+  ports:
+    - { name: s3, port: 8333 }
+    - { name: master, port: 9333 }
+    - { name: filer, port: 8888 }
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: s3-bucket
+  namespace: velero
+spec:
+  backoffLimit: 20
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: create-bucket
+          image: chrislusf/seaweedfs:3.80
+          command: ["sh", "-c"]
+          args:
+            - |
+              set -e
+              shell="weed shell -master=s3.velero:9333 -filer=s3.velero:8888"
+              echo "s3.bucket.create -name velero" | timeout 60 $shell
+              echo "s3.bucket.list" | timeout 60 $shell | grep velero

@@ -1,0 +1,23 @@
+# Add 100 ms (±50 ms) to every packet from the order service to Postgres for
+# three minutes. Checkout should get slower but stay inside its SLO.
+apiVersion: chaos-mesh.org/v1alpha1
+kind: NetworkChaos
+metadata:
+  name: slow-database
+  namespace: shopflow-local
+spec:
+  action: delay
+  mode: all
+  selector:
+    namespaces: [shopflow-local]
+    labelSelectors: { app: order-service }
+  direction: to
+  target:
+    mode: all
+    selector:
+      namespaces: [shopflow-local]
+      labelSelectors: { app: postgres }
+  delay:
+    latency: 100ms
+    jitter: 50ms
+  duration: 3m

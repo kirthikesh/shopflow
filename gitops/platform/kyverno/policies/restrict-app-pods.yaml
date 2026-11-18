@@ -1,0 +1,44 @@
+# Our own services run hardened: as non-root, with no privilege escalation,
+# all Linux capabilities dropped, and health probes so Kubernetes can tell
+# when they're broken. (The data stores are third-party images and are
+# covered by the namespace's Pod Security level instead.)
+apiVersion: policies.kyverno.io/v1
+kind: ValidatingPolicy
+metadata:
+  name: harden-app-pods
+  annotations:
+    policies.kyverno.io/title: Harden application pods
+    policies.kyverno.io/severity: high
+spec:
+  validationActions: [Deny]
+  evaluation:
+    background:
+      enabled: false   # admission only; no background scans on a laptop
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [pods]
+    namespaceSelector:
+      matchExpressions:
+        - key: kubernetes.io/metadata.name
+          operator: In
+          values: [shopflow-local, shopflow-dev, shopflow-prod]
+    objectSelector:
+      matchLabels:
+        part-of: shopflow
+  validations:
+    - expression: >-
+        has(object.spec.securityContext) && has(object.spec.securityContext.runAsNonRoot) &&
+        object.spec.securityContext.runAsNonRoot == true
+      message: Application pods must run as non-root.
+    - expression: >-
+        object.spec.containers.all(c,
+          has(c.securityContext) &&
+          has(c.securityContext.allowPrivilegeEscalation) && c.securityContext.allowPrivilegeEscalation == false &&
+          has(c.securityContext.capabilities) && has(c.securityContext.capabilities.drop) &&
+          'ALL' in c.securityContext.capabilities.drop)
+      message: Containers must drop all capabilities and disallow privilege escalation.
+    - expression: object.spec.containers.all(c, has(c.livenessProbe) && has(c.readinessProbe))
+      message: Containers need liveness and readiness probes.

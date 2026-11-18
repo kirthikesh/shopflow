@@ -1,0 +1,19 @@
+# One-node kind cluster for the local platform. Traefik's NodePorts are
+# mapped to ports 9080 and 9443 on the laptop (80 and 443 are often taken),
+# so the shop is at https://shop.localtest.me:9443.
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: shopflow
+nodes:
+  - role: control-plane
+    # etcd on the node's tmpfs: a laptop's Docker disk is too slow for it, and
+    # a slow etcd makes the whole control plane time out and restart.
+    kubeadmConfigPatches:
+      - |
+        kind: ClusterConfiguration
+        etcd:
+          local:
+            dataDir: /tmp/etcd
+    extraPortMappings:
+      - { containerPort: 30080, hostPort: 9080, protocol: TCP }
+      - { containerPort: 30443, hostPort: 9443, protocol: TCP }

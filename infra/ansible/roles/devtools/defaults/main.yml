@@ -13,3 +13,4 @@ devtools_repos:
 # (CVE-2026-33634). Scanners are upgraded deliberately, not automatically.
 devtools_trivy_version: 0.76.1
 devtools_kustomize_version: 5.8.3
+devtools_cosign_version: 2.4.1

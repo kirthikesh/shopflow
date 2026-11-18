@@ -17,6 +17,9 @@ locals {
   private_dns_zones = {
     acr       = "privatelink.azurecr.io"
     key_vault = "privatelink.vaultcore.azure.net"
+    # Private AKS API servers (Phase 7). One zone in the hub, linked to every
+    # spoke, so the pipeline agent in the hub can resolve the cluster.
+    aks = "privatelink.${var.location}.azmk8s.io"
   }
 }
 
@@ -92,4 +95,13 @@ module "policy" {
 
   name_prefix     = local.name_prefix
   subscription_id = data.azurerm_subscription.current.id
+}
+
+# ---- Phase 7: Microsoft Defender for Containers ------------------------------
+# Runtime threat detection, vulnerability assessment of ACR images and
+# Kubernetes posture checks. Billed per vCore, so it's off unless asked for.
+resource "azurerm_security_center_subscription_pricing" "containers" {
+  count         = var.defender_for_containers ? 1 : 0
+  tier          = "Standard"
+  resource_type = "Containers"
 }

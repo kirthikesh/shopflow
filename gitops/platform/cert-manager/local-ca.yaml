@@ -1,0 +1,30 @@
+# A private CA for the local cluster: a self-signed root, and a ClusterIssuer
+# that signs Ingress certificates with it. On Azure this would be a Let's
+# Encrypt ACME ClusterIssuer instead; the Ingress annotation stays the same.
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: selfsigned
+spec:
+  selfSigned: {}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: shopflow-local-ca
+  namespace: cert-manager
+spec:
+  isCA: true
+  commonName: ShopFlow local CA
+  secretName: shopflow-local-ca
+  duration: 8760h
+  privateKey: { algorithm: ECDSA, size: 256 }
+  issuerRef: { name: selfsigned, kind: ClusterIssuer }
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: shopflow-local-ca
+spec:
+  ca:
+    secretName: shopflow-local-ca

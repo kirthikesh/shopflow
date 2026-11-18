@@ -26,6 +26,14 @@ resource "azurerm_role_assignment" "control_plane_network" {
   principal_id         = azurerm_user_assigned_identity.control_plane.principal_id
 }
 
+# A private cluster writes its API server's record into the hub's DNS zone.
+resource "azurerm_role_assignment" "control_plane_dns" {
+  count                = var.api_server_private ? 1 : 0
+  scope                = var.private_dns_zone_id
+  role_definition_name = "Private DNS Zone Contributor"
+  principal_id         = azurerm_user_assigned_identity.control_plane.principal_id
+}
+
 resource "azurerm_kubernetes_cluster" "this" {
   name                = var.name
   location            = var.location
@@ -44,6 +52,10 @@ resource "azurerm_kubernetes_cluster" "this" {
   oidc_issuer_enabled          = true
   workload_identity_enabled    = true
   private_cluster_enabled      = var.api_server_private
+  # Private API: the name resolves through the hub's zone, so the pipeline
+  # agent in the hub can reach it over peering. Public: "System" is unused.
+  private_dns_zone_id          = var.api_server_private ? var.private_dns_zone_id : null
+  azure_policy_enabled         = var.azure_policy_enabled
   image_cleaner_enabled        = true
   image_cleaner_interval_hours = 48
 
@@ -108,7 +120,7 @@ resource "azurerm_kubernetes_cluster" "this" {
     secret_rotation_enabled = true
   }
 
-  depends_on = [azurerm_role_assignment.control_plane_network]
+  depends_on = [azurerm_role_assignment.control_plane_network, azurerm_role_assignment.control_plane_dns]
 
   lifecycle {
     # Patch upgrades happen automatically; don't fight them on the next plan.

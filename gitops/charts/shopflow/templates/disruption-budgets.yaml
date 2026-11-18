@@ -1,0 +1,18 @@
+{{- /*
+Keep at least one pod of each stateless service running through node drains
+and voluntary disruptions (upgrades, chaos tests that evict pods).
+*/}}
+{{- if .Values.podDisruptionBudgets }}
+{{- range $name := list "frontend" "product-service" "cart-service" "order-service" }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ $name }}
+  labels: { environment: {{ $.Values.environment | quote }}, app: {{ $name }}, part-of: shopflow }
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels: { app: {{ $name }} }
+---
+{{- end }}
+{{- end }}

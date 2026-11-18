@@ -47,6 +47,15 @@ The pipeline waits for the Rollout to be `Healthy` on the new version, and fails
 
 Dev stays a plain `Deployment`: canaries need two replicas, and dev is where a version gets tested first anyway.
 
+## Platform add-ons
+
+[`platform/`](platform) holds the cluster-wide pieces the chart builds on: Traefik, cert-manager,
+Kyverno policies, kube-prometheus-stack, the OpenTelemetry Operator and Tempo, KEDA, Chaos Mesh and
+Velero. The chart turns on what it needs per environment (`ingress`, `observability`,
+`autoscaling`, `podDisruptionBudgets`, `secrets.provider`), and [`envs/local`](envs/local) is the
+laptop environment that [`../local`](../local) installs. Results are in
+[`../local/README.md`](../local/README.md).
+
 ## Layout
 
 ```

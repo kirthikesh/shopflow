@@ -23,6 +23,7 @@ spec:
     metadata:
       labels: { environment: {{ .Values.environment | quote }}, app: postgres }
     spec:
+      {{- include "shopflow.serviceAccount" . | nindent 6 }}
       containers:
         - name: postgres
           image: postgres:17-alpine
@@ -39,15 +40,18 @@ spec:
           readinessProbe:
             exec:
               command: ["pg_isready", "-U", "shopflow"]
+            timeoutSeconds: 5
             periodSeconds: 5
           resources:
             {{- toYaml (index .Values.workloads "postgres").resources | nindent 12 }}
           volumeMounts:
+            {{- include "shopflow.secretsMount" . | nindent 12 }}
             - name: data
               mountPath: /var/lib/postgresql/data
             - name: init
               mountPath: /docker-entrypoint-initdb.d
       volumes:
+        {{- include "shopflow.secretsVolume" . | nindent 8 }}
         - name: init
           configMap: { name: postgres-init }
   volumeClaimTemplates:

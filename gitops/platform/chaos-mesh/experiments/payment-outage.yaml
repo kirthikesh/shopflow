@@ -1,0 +1,15 @@
+# Take payment-service down for two minutes. Orders still get accepted
+# (they wait on the queue as PENDING_PAYMENT) and are paid once it's back:
+# the queue absorbs the outage.
+apiVersion: chaos-mesh.org/v1alpha1
+kind: PodChaos
+metadata:
+  name: payment-outage
+  namespace: shopflow-local
+spec:
+  action: pod-failure
+  mode: all
+  selector:
+    namespaces: [shopflow-local]
+    labelSelectors: { app: payment-service }
+  duration: 2m

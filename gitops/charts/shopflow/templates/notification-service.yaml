@@ -1,10 +1,14 @@
+{{- /* Only with Service Bus: these two services do nothing else. */}}
+{{- if .Values.messaging.enabled }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: notification-service
   labels: { environment: {{ .Values.environment | quote }}, app: notification-service, part-of: shopflow }
 spec:
+  {{- if not (include "shopflow.autoscaled" (list . "notification-service")) }}
   replicas: {{ (index .Values.workloads "notification-service").replicas | default 1 }}
+  {{- end }}
   strategy:
     {{- toYaml .Values.updateStrategy | nindent 4 }}
   revisionHistoryLimit: 3
@@ -13,7 +17,9 @@ spec:
   template:
     metadata:
       labels: { environment: {{ .Values.environment | quote }}, app: notification-service, part-of: shopflow }
+      {{- include "shopflow.podAnnotations" (list . "notification-service" "nodejs") | nindent 6 }}
     spec:
+      {{- include "shopflow.serviceAccount" . | nindent 6 }}
       automountServiceAccountToken: false
       securityContext:
         runAsNonRoot: true
@@ -40,17 +46,21 @@ spec:
             capabilities: { drop: ["ALL"] }
           livenessProbe:
             httpGet: { path: /health, port: http }
+            timeoutSeconds: 3
             periodSeconds: 15
             failureThreshold: 3
           readinessProbe:
             httpGet: { path: /ready, port: http }
+            timeoutSeconds: 3
             periodSeconds: 5
           resources:
             {{- toYaml (index .Values.workloads "notification-service").resources | nindent 12 }}
           volumeMounts:
+            {{- include "shopflow.secretsMount" . | nindent 12 }}
             - name: tmp
               mountPath: /tmp
       volumes:
+        {{- include "shopflow.secretsVolume" . | nindent 8 }}
         - name: tmp
           emptyDir: {}
 ---
@@ -65,3 +75,4 @@ spec:
     - name: http
       port: 8084
       targetPort: http
+{{- end }}

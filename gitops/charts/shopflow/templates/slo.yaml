@@ -1,0 +1,65 @@
+{{- /*
+Service level objectives as Prometheus rules, with multi-window burn-rate
+alerts (Google SRE workbook): page when the error budget would be gone in
+about 2 days, open a ticket when it would be gone in about 5.
+
+  Checkout availability  99.5% of order API requests succeed (no 5xx)
+  Catalog latency        99% of product API requests finish within 500 ms
+  Payment processing     99.9% of payment messages are handled without failure
+*/}}
+{{- if .Values.observability.enabled }}
+{{- $env := .Values.environment }}
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: shopflow-slos
+  labels: { environment: {{ $env | quote }}, part-of: shopflow }
+spec:
+  groups:
+    - name: shopflow-sli
+      interval: 30s
+      rules:
+        {{- range $w := list "5m" "30m" "1h" "6h" }}
+        - record: shopflow:checkout_errors:ratio_rate{{ $w }}
+          expr: |
+            sum(rate(http_server_requests_seconds_count{namespace="{{ $.Release.Namespace }}", uri=~"/orders.*", status=~"5.."}[{{ $w }}]))
+            /
+            clamp_min(sum(rate(http_server_requests_seconds_count{namespace="{{ $.Release.Namespace }}", uri=~"/orders.*"}[{{ $w }}])), 1e-9)
+        - record: shopflow:catalog_slow:ratio_rate{{ $w }}
+          expr: |
+            1 - (
+              sum(rate(http_request_duration_seconds_bucket{namespace="{{ $.Release.Namespace }}", service="product-service", le="0.5"}[{{ $w }}]))
+              /
+              clamp_min(sum(rate(http_request_duration_seconds_count{namespace="{{ $.Release.Namespace }}", service="product-service"}[{{ $w }}])), 1e-9)
+            )
+        - record: shopflow:payment_failures:ratio_rate{{ $w }}
+          expr: |
+            sum(rate(shopflow_payment_messages_failed_total{namespace="{{ $.Release.Namespace }}"}[{{ $w }}]))
+            /
+            clamp_min(sum(rate(shopflow_payments_processed_total{namespace="{{ $.Release.Namespace }}"}[{{ $w }}])) + sum(rate(shopflow_payment_messages_failed_total{namespace="{{ $.Release.Namespace }}"}[{{ $w }}])), 1e-9)
+        {{- end }}
+    - name: shopflow-slo-alerts
+      rules:
+        {{- range $slo := list (dict "name" "Checkout" "metric" "checkout_errors" "budget" "0.005") (dict "name" "CatalogLatency" "metric" "catalog_slow" "budget" "0.01") (dict "name" "Payments" "metric" "payment_failures" "budget" "0.001") }}
+        - alert: {{ $slo.name }}ErrorBudgetFastBurn
+          expr: |
+            shopflow:{{ $slo.metric }}:ratio_rate1h > (14.4 * {{ $slo.budget }})
+            and
+            shopflow:{{ $slo.metric }}:ratio_rate5m > (14.4 * {{ $slo.budget }})
+          for: 2m
+          labels: { severity: page, slo: {{ $slo.name | lower }}, environment: {{ $env | quote }} }
+          annotations:
+            summary: "{{ $slo.name }} SLO is burning its error budget 14x too fast"
+            description: "At this rate the 30-day error budget is gone in about 2 days."
+        - alert: {{ $slo.name }}ErrorBudgetSlowBurn
+          expr: |
+            shopflow:{{ $slo.metric }}:ratio_rate6h > (6 * {{ $slo.budget }})
+            and
+            shopflow:{{ $slo.metric }}:ratio_rate30m > (6 * {{ $slo.budget }})
+          for: 15m
+          labels: { severity: ticket, slo: {{ $slo.name | lower }}, environment: {{ $env | quote }} }
+          annotations:
+            summary: "{{ $slo.name }} SLO is burning its error budget 6x too fast"
+            description: "At this rate the 30-day error budget is gone in about 5 days."
+        {{- end }}
+{{- end }}

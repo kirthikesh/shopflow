@@ -1,0 +1,52 @@
+# Azure only: every ShopFlow image from ACR must be signed by the app pipeline
+# (cosign, key kept as an Azure DevOps secure file) and carry its SBOM as a
+# signed attestation. An unsigned or tampered image is rejected at admission.
+# Images built on a laptop aren't signed, so this isn't installed locally.
+apiVersion: policies.kyverno.io/v1
+kind: ImageValidatingPolicy
+metadata:
+  name: verify-image-signatures
+  annotations:
+    policies.kyverno.io/title: Verify image signatures
+    policies.kyverno.io/severity: high
+spec:
+  validationActions: [Deny]
+  webhookConfiguration:
+    timeoutSeconds: 30
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [pods]
+    namespaceSelector:
+      matchExpressions:
+        - key: kubernetes.io/metadata.name
+          operator: In
+          values: [shopflow-dev, shopflow-prod]
+  matchImageReferences:
+    - glob: "acrshopflow*.azurecr.io/shopflow/*"
+  attestors:
+    - name: pipeline
+      cosign:
+        key:
+          # cosign.pub, the public half of the pipeline's signing key.
+          data: |
+            -----BEGIN PUBLIC KEY-----
+            REPLACE_WITH_COSIGN_PUBLIC_KEY
+            -----END PUBLIC KEY-----
+        # Signed without the public transparency log (private images).
+        ctlog:
+          insecureIgnoreTlog: true
+          insecureIgnoreSCT: true
+  attestations:
+    - name: sbom
+      intoto:
+        type: https://cyclonedx.org/bom
+  validations:
+    - expression: >-
+        images.containers.map(image, verifyImageSignatures(image, [attestors.pipeline])).all(e, e > 0)
+      message: ShopFlow images must be signed by the app pipeline.
+    - expression: >-
+        images.containers.map(image, verifyAttestationSignatures(image, attestations.sbom, [attestors.pipeline])).all(e, e > 0)
+      message: ShopFlow images must carry a signed SBOM attestation.

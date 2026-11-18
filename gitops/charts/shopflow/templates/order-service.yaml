@@ -4,7 +4,9 @@ metadata:
   name: order-service
   labels: { environment: {{ .Values.environment | quote }}, app: order-service, part-of: shopflow }
 spec:
+  {{- if not (include "shopflow.autoscaled" (list . "order-service")) }}
   replicas: {{ (index .Values.workloads "order-service").replicas | default 1 }}
+  {{- end }}
   strategy:
     {{- toYaml .Values.updateStrategy | nindent 4 }}
   revisionHistoryLimit: 3
@@ -13,7 +15,9 @@ spec:
   template:
     metadata:
       labels: { environment: {{ .Values.environment | quote }}, app: order-service, part-of: shopflow }
+      {{- include "shopflow.podAnnotations" (list . "order-service" "java") | nindent 6 }}
     spec:
+      {{- include "shopflow.serviceAccount" . | nindent 6 }}
       automountServiceAccountToken: false
       securityContext:
         runAsNonRoot: true
@@ -42,28 +46,33 @@ spec:
             - name: PRODUCT_SERVICE_URL
               value: "http://product-service:8000"
             - name: MESSAGING_ENABLED
-              value: "true"
+              value: {{ .Values.messaging.enabled | quote }}
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
             capabilities: { drop: ["ALL"] }
           startupProbe:
             httpGet: { path: /health/liveness, port: http }
+            timeoutSeconds: 3
             periodSeconds: 5
-            failureThreshold: 36   # Spring Boot gets up to 3 minutes to start
+            failureThreshold: 72   # Spring Boot gets up to 6 minutes on a busy node
           livenessProbe:
             httpGet: { path: /health/liveness, port: http }
+            timeoutSeconds: 3
             periodSeconds: 15
             failureThreshold: 3
           readinessProbe:
             httpGet: { path: /health/readiness, port: http }
+            timeoutSeconds: 3
             periodSeconds: 5
           resources:
             {{- toYaml (index .Values.workloads "order-service").resources | nindent 12 }}
           volumeMounts:
+            {{- include "shopflow.secretsMount" . | nindent 12 }}
             - name: tmp
               mountPath: /tmp
       volumes:
+        {{- include "shopflow.secretsVolume" . | nindent 8 }}
         - name: tmp
           emptyDir: {}
 ---

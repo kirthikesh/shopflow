@@ -36,11 +36,17 @@ pool:
   name: Default
 
 variables:
-  platformResourceGroup: rg-shopflow-platform-neu
-  devResourceGroup: rg-shopflow-dev-neu
+  # Library > Variable groups > shopflow-signing: COSIGN_PASSWORD (secret).
+  - group: shopflow-signing
+  - name: platformResourceGroup
+    value: rg-shopflow-platform-neu
+  - name: devResourceGroup
+    value: rg-shopflow-dev-neu
   # This pipeline lives in the app/ folder of the ShopFlow monorepo.
-  appDir: $(System.DefaultWorkingDirectory)/app
-  isMain: $[ and(eq(variables['Build.SourceBranch'], 'refs/heads/main'), ne(variables['Build.Reason'], 'PullRequest')) ]
+  - name: appDir
+    value: $(System.DefaultWorkingDirectory)/app
+  - name: isMain
+    value: $[ and(eq(variables['Build.SourceBranch'], 'refs/heads/main'), ne(variables['Build.Reason'], 'PullRequest')) ]
 
 stages:
   # ---------------------------------------------------------------------------
@@ -94,6 +100,14 @@ stages:
           - bash: az acr login --name "$(ACR)"
             displayName: Registry login
             condition: and(succeeded(), eq(variables.isMain, true))
+
+          # cosign private key (Library > Secure files), used to sign what we push.
+          - task: DownloadSecureFile@1
+            name: cosignKey
+            displayName: Download image signing key
+            condition: and(succeeded(), eq(variables.isMain, true))
+            inputs:
+              secureFile: cosign.key
 
           - ${{ each svc in parameters.services }}:
               - template: .azure-pipelines/templates/build-image.yml

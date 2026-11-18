@@ -64,7 +64,7 @@ resource "azurerm_network_security_rule" "ssh_from_admin" {
 # zone, so the identity is powerful. That is why the VM is hardened, accepts SSH only
 # from the admin, and every apply waits for a human approval in Azure DevOps.
 #
-# It is NOT Owner. It can grant only the four roles our modules hand out
+# It is NOT Owner. It can grant only the roles our modules hand out
 # (constrained delegation), so a compromised pipeline cannot make itself or
 # anyone else Owner.
 
@@ -81,6 +81,8 @@ data "azurerm_role_definition" "delegable" {
     "Network Contributor",                         # AKS control plane -> node subnet
     "Azure Kubernetes Service RBAC Cluster Admin", # admins -> cluster
     "Key Vault Secrets Officer",                   # admins -> vault
+    "Key Vault Secrets User",                      # app workload identities -> vault (Phase 7)
+    "Private DNS Zone Contributor",                # AKS control plane -> private API zone (Phase 7)
   ])
   name  = each.value
   scope = data.azurerm_subscription.current.id

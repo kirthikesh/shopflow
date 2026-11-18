@@ -1,0 +1,46 @@
+{{- /*
+Metrics, SLOs and the dashboard, for the Prometheus Operator (kube-prometheus-stack).
+Every backend service serves Prometheus metrics on /metrics.
+*/}}
+{{- if .Values.observability.enabled }}
+{{- range $name := list "product-service" "cart-service" "order-service" "payment-service" "notification-service" }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ $name }}
+  labels: { environment: {{ $.Values.environment | quote }}, app: {{ $name }}, part-of: shopflow }
+spec:
+  selector:
+    matchLabels: { app: {{ $name }} }
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 15s
+---
+{{- end }}
+# Prometheus lives in another namespace; let it reach the metrics ports.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: metrics-from-monitoring
+spec:
+  podSelector:
+    matchLabels: { part-of: shopflow }
+  policyTypes: ["Ingress"]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: monitoring }
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: shopflow-dashboard
+  labels:
+    grafana_dashboard: "1"
+  annotations:
+    grafana_folder: ShopFlow
+data:
+  shopflow.json: |-
+{{ .Files.Get "dashboards/shopflow.json" | indent 4 }}
+{{- end }}

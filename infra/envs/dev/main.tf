@@ -92,6 +92,7 @@ module "aks" {
   node_subnet_id                  = module.spoke_network.subnet_ids.aks_nodes
   node_vm_size                    = var.aks_node_vm_size
   api_server_private              = var.aks_api_server_private
+  private_dns_zone_id             = local.platform.private_dns_zone_ids.aks
   api_server_authorized_ip_ranges = var.aks_api_server_authorized_ip_ranges
   admin_object_ids                = var.admin_object_ids
   acr_id                          = local.platform.acr_id

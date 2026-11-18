@@ -1,0 +1,67 @@
+# local: the whole platform on a kind cluster on a laptop (see local/ at the
+# repo root). Images are built locally and loaded into the cluster, so there
+# is no registry to pull from and the tag is fixed.
+environment: local
+
+image:
+  registry: shopflow.local
+  tag: "local"
+
+publicEndpoint:
+  enabled: false
+
+# The Service Bus emulator needs SQL Server (about 2 GB, emulated on Apple
+# Silicon), which an 8 GB laptop can't spare next to the cluster. Orders are
+# placed and stored; payment and email run on Azure. MESSAGING=1 local/up.sh
+# turns it back on where there's room.
+messaging:
+  enabled: false
+
+ingress:
+  enabled: true
+  host: shop.localtest.me          # resolves to 127.0.0.1
+  tls:
+    enabled: true
+    clusterIssuer: shopflow-local-ca
+
+# Sized for a laptop with 8 GB of RAM: one pod per service. KEDA adds
+# product-service pods under load, and the chaos test asks for two.
+# The services on the request path get a real CPU share, so their health
+# checks keep passing under load (on AKS the node is quieter).
+workloads:
+  frontend:
+    resources:
+      requests: { cpu: 200m, memory: 128Mi }
+      limits: { memory: 384Mi }
+  product-service:
+    resources:
+      requests: { cpu: 100m, memory: 128Mi }
+      limits: { memory: 256Mi }
+  cart-service:
+    resources:
+      requests: { cpu: 50m, memory: 96Mi }
+      limits: { memory: 256Mi }
+  order-service:
+    resources:
+      requests: { cpu: 250m, memory: 384Mi }
+      limits: { memory: 768Mi }
+  postgres:
+    resources:
+      requests: { cpu: 100m, memory: 256Mi }
+      limits: { memory: 512Mi }
+podDisruptionBudgets: true
+
+observability:
+  enabled: true
+  # Turned on by `make tracing-on`, which installs the OpenTelemetry Operator first.
+  tracing: false
+
+autoscaling:
+  enabled: true
+  workloads:
+    product-service:
+      trigger: prometheus
+      min: 1
+      max: 4
+      query: sum(rate(http_requests_total{namespace="shopflow-local", service="product-service"}[1m]))
+      threshold: "3"            # requests per second per pod: low, so a laptop-sized test scales it

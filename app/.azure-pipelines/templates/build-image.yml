@@ -1,8 +1,10 @@
-# Builds one service image, scans it, writes its SBOM and, on main, pushes it.
+# Builds one service image, scans it, writes its SBOM and, on main, pushes it
+# and signs it.
 #
 #   Gate     fails on CRITICAL vulnerabilities that have a fix available
 #   Report   every HIGH and CRITICAL finding goes to the Tests tab
-#   SBOM     CycloneDX, published as a build artifact
+#   SBOM     CycloneDX, published as a build artifact and attached to the image
+#   Sign     cosign signature + SBOM attestation, checked by Kyverno at admission
 parameters:
   - name: service
     type: string
@@ -40,3 +42,17 @@ steps:
           set -euo pipefail
           docker push --all-tags "$(ACR).azurecr.io/shopflow/${{ parameters.service }}"
         displayName: ${{ parameters.service }} · push
+
+      # Sign by digest, never by tag, and attach the SBOM as a signed attestation.
+      # Kyverno's verify-image-signatures policy rejects any ACR image without both.
+      - bash: |
+          set -euo pipefail
+          repo="$(ACR).azurecr.io/shopflow/${{ parameters.service }}"
+          digest=$(docker inspect --format '{{index .RepoDigests 0}}' "$repo:$(imageTag)")
+          cosign sign --yes --tlog-upload=false --key "$(cosignKey.secureFilePath)" "$digest"
+          cosign attest --yes --tlog-upload=false --key "$(cosignKey.secureFilePath)" \
+            --type cyclonedx --predicate "$(Build.ArtifactStagingDirectory)/sbom/${{ parameters.service }}.cdx.json" "$digest"
+          echo "Signed $digest"
+        displayName: ${{ parameters.service }} · sign
+        env:
+          COSIGN_PASSWORD: $(COSIGN_PASSWORD)
