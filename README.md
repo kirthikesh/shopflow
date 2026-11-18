@@ -12,11 +12,10 @@ An event-driven microservices store and the enterprise Azure platform it runs on
 six services in five languages, a Terraform landing zone, AKS, Azure DevOps pipelines that authenticate
 with a managed identity, and GitOps releases with Argo CD, including canary releases in prod.
 
-> **Status:** Phases 1–6 ran on Azure; the environment is torn down to save cost, and the
-> screenshots are from the last live release. Phases 7–9 run on a free **local cluster**
-> ([`local/`](local)): policies, SLOs, autoscaling, load and backup tests, with results. Their
-> Azure halves (Key Vault, Defender, Azure Policy, private API, image signing) are written and
-> validated with `terraform validate`, not yet applied.
+> **Status:** Phases 1–6 and 10 are complete; 7–9 are built, and partly run (see the
+> [status table](#roadmap-and-status)). Phases 1–6 ran on Azure, which is now torn down to save
+> cost; the screenshots are from the last live release. Phases 7–9 ran on a free local cluster
+> ([`local/`](local)), with the results written up.
 
 ![ShopFlow running in prod on AKS](app/docs/images/shop-home.jpg)
 
@@ -78,23 +77,33 @@ cd app && make up          # http://localhost:3000
 cd infra && make bootstrap && make up
 ```
 
-## Roadmap
+## Roadmap and status
 
-- [x] **Phase 1:** Six services, Dockerfiles, local stack with the Service Bus emulator
-- [x] **Phase 2:** Terraform landing zone: hub-spoke network, private DNS, remote state, guardrails
-- [x] **Phase 3:** AKS with Workload Identity, Cilium and Entra ID RBAC; real Service Bus
-- [x] **Phase 4:** Ansible: hardened jump box and self-hosted Azure DevOps agent
-- [x] **Phase 5:** Azure DevOps pipelines: templates, Trivy scanning, SBOMs, approvals, managed-identity auth
-- [x] **Phase 6:** GitOps CD with Argo CD: dev and prod, approval-gated promotion, canary releases with Argo Rollouts
-- [x] **Phases 3–5 follow-ups:** ingress with cert-manager (run locally); private API server and image signing (written for Azure)
-- [x] **Phase 7:** Kyverno policies (run locally); Key Vault with Workload Identity, Defender for Containers, Azure Policy (written for Azure)
-- [x] **Phase 8:** Prometheus, Grafana dashboard, SLOs with burn-rate alerts (run locally); OpenTelemetry tracing (written, not yet run)
-- [x] **Phase 9:** KEDA autoscaling, k6 load test, Velero backup drill (run locally); Chaos Mesh experiments (written, not yet run)
-- [x] **Phase 10:** Write-up: this README, [`local/README.md`](local/README.md) with the results and the problems I hit
+✅ done and run · 🟡 built, but parts not run yet · ⬜ not started
 
-Known follow-ups: a transactional outbox in the order service, stock reservation as a saga, a
-`pg_dump` backup hook so the local drill restores Postgres rows too, and running the tracing and
-chaos tests on a machine with more memory.
+| Phase | Status | What ran | What's written but not run yet |
+|---|---|---|---|
+| 1. Six services, local stack | ✅ | Docker Compose with the Service Bus emulator | |
+| 2. Terraform landing zone | ✅ | Azure: hub-spoke, private DNS, remote state, guardrails | |
+| 3. AKS and Service Bus | ✅ | Azure: AKS with Workload Identity, Cilium, Entra ID RBAC | |
+| 4. Ansible jump box and agent | ✅ | Azure: hardened jump box, self-hosted Azure DevOps agent | |
+| 5. Azure DevOps pipelines | ✅ | Azure: templates, Trivy gate, SBOMs, approvals, managed-identity auth | |
+| 6. GitOps and canary releases | ✅ | Azure: Argo CD dev and prod, approval-gated promotion, Argo Rollouts canary | |
+| 7. Security | 🟡 | Local: Kyverno policies, cert-manager TLS on the Ingress | Azure: Key Vault with Workload Identity, Defender for Containers, Azure Policy, private API server, cosign image signing |
+| 8. Observability | 🟡 | Local: Prometheus, Grafana dashboard, SLOs with burn-rate alerts | OpenTelemetry tracing with Tempo |
+| 9. Resilience | 🟡 | Local: KEDA autoscaling, k6 load test, Velero backup and restore | Chaos Mesh experiments; restoring Postgres rows in the local drill |
+| 10. Write-up | ✅ | This README and [`local/README.md`](local/README.md): results, limits, problems I hit | |
+
+Why the 🟡 parts haven't run: the Azure subscription's credit ended before Phase 7, so the Azure
+security pieces are validated with `terraform validate` but not applied, and the laptop the local
+platform runs on (8 GB) has no memory left for tracing or Chaos Mesh next to everything else.
+Results and limits are in [`local/README.md`](local/README.md).
+
+Next steps:
+- Apply the Phase 7 Azure parts on a new subscription and run the pipeline end to end from this repo.
+- Run tracing and the chaos test on a machine with 16 GB or more (`make tracing-on`, `make chaos-test`).
+- A `pg_dump` pre-backup hook, so the local drill restores Postgres rows too (on AKS, Velero snapshots the Azure Disk).
+- In the app: a transactional outbox in the order service, and stock reservation as a saga.
 
 ## History
 
